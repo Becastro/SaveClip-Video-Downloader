@@ -1,0 +1,75 @@
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      DOWNLOAD_DIR: /data/downloads
+      MAX_DURATION_SECONDS: ${MAX_DURATION_SECONDS:-7200}
+      MAX_FILE_SIZE_BYTES: ${MAX_FILE_SIZE_BYTES:-2147483648}
+      FILE_TTL_MINUTES: ${FILE_TTL_MINUTES:-25}
+      RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS:-10}
+      RATE_LIMIT_WINDOW_SECONDS: ${RATE_LIMIT_WINDOW_SECONDS:-60}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://localhost:5173}
+      EXTRA_ALLOWED_DOMAINS: ${EXTRA_ALLOWED_DOMAINS:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - downloads:/data/downloads
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+    command: ["rq", "worker", "-u", "redis://redis:6379/0", "downloads"]
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      DOWNLOAD_DIR: /data/downloads
+      MAX_DURATION_SECONDS: ${MAX_DURATION_SECONDS:-7200}
+      MAX_FILE_SIZE_BYTES: ${MAX_FILE_SIZE_BYTES:-2147483648}
+      FILE_TTL_MINUTES: ${FILE_TTL_MINUTES:-25}
+      EXTRA_ALLOWED_DOMAINS: ${EXTRA_ALLOWED_DOMAINS:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - downloads:/data/downloads
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "${APP_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  downloads:
