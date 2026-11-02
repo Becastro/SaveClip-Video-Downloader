@@ -38,9 +38,11 @@ const english = {
   " itens": " items",
   "Autor indisponível": "Creator unavailable",
   "Nome do arquivo": "Filename",
+  "Nome da pasta": "Folder name",
   "Usar o título original": "Use the original title",
+  "Usar o título da playlist": "Use the playlist title",
   "A extensão será adicionada automaticamente": "The file extension will be added automatically",
-  "; vários itens serão agrupados em um ZIP.": "; selected items will be bundled into a ZIP file.",
+  "Os itens selecionados serão salvos em uma pasta.": "Selected items will be saved in a folder.",
   "Volume do arquivo": "Output volume",
   "100% mantém o áudio original; acima disso pode haver distorção.":
     "100% keeps the original audio; higher levels may cause distortion.",
@@ -60,6 +62,7 @@ const english = {
   "Concluído": "Done",
   "Cancelar download": "Cancel download",
   "Abrir local do download": "Open download location",
+  "Abrir pasta do download": "Open download folder",
   "Não foi possível abrir o local do download:": "Could not open the download location:",
   "Cole o link com Ctrl+V ou permita o acesso à área de transferência.":
     "Paste the link with Ctrl+V or allow clipboard access.",

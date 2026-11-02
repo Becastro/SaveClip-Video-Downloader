@@ -336,7 +336,7 @@ function App() {
       const source = new EventSource(`/api/progress/${result.task_id}`);
       eventSource.current?.close();
       eventSource.current = source;
-      source.onmessage = (event) => {
+      source.onmessage = async (event) => {
         let progressState;
         try {
           progressState = JSON.parse(event.data);
@@ -365,12 +365,31 @@ function App() {
             size: Number(progressState.size || 0),
           };
           setHistory((previous) => [item, ...previous.filter((entry) => entry.id !== item.id)].slice(0, 30));
-          const link = document.createElement("a");
-          link.href = `/api/file/${result.task_id}`;
-          link.download = progressState.filename || "";
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
+          if (isPlaylist) {
+            if (!window.pywebview?.api) {
+              try {
+                const playlist = await request(`/api/files/${result.task_id}`);
+                for (const file of playlist.files) {
+                  const link = document.createElement("a");
+                  link.href = `/api/file/${result.task_id}/item?filename=${encodeURIComponent(file.name)}`;
+                  link.download = file.name;
+                  document.body.appendChild(link);
+                  link.click();
+                  link.remove();
+                  await new Promise((resolve) => setTimeout(resolve, 150));
+                }
+              } catch (reason) {
+                setError(reason.message);
+              }
+            }
+          } else {
+            const link = document.createElement("a");
+            link.href = `/api/file/${result.task_id}`;
+            link.download = progressState.filename || "";
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+          }
         }
         if (progressState.status === "failed") {
           source.close();
@@ -590,18 +609,18 @@ function App() {
                 <h2>{info.title}</h2>
                 <p>{info.author || t("Autor indisponível")}</p>
                 <div className="output-name">
-                  <label htmlFor="output-name">{t("Nome do arquivo")}</label>
+                  <label htmlFor="output-name">{t(isPlaylist ? "Nome da pasta" : "Nome do arquivo")}</label>
                   <input
                     id="output-name"
                     type="text"
                     value={outputName}
                     maxLength={120}
                     disabled={downloadActive}
-                    placeholder={t("Usar o título original")}
+                    placeholder={t(isPlaylist ? "Usar o título da playlist" : "Usar o título original")}
                     autoComplete="off"
                     onChange={(event) => setOutputName(event.target.value)}
                   />
-                  <span>{t("A extensão será adicionada automaticamente")}{isPlaylist ? t("; vários itens serão agrupados em um ZIP.") : t(".")}</span>
+                  <span>{isPlaylist ? t("Os itens selecionados serão salvos em uma pasta.") : `${t("A extensão será adicionada automaticamente")}.`}</span>
                 </div>
                 <div className="output-volume">
                   <div className="output-volume-heading">
@@ -669,7 +688,7 @@ function App() {
                   {downloadActive && <button className="quiet-button" onClick={cancelDownload} disabled={job.status === "cancel_requested"}>{job.status === "cancel_requested" ? t("Cancelando…") : t("Cancelar download")}</button>}
                   {job.status === "completed" && window.pywebview?.api?.open_download_location && (
                     <button className="quiet-button" onClick={openDownloadLocation}>
-                      <Icon name="folder" size={14} /> {t("Abrir local do download")}
+                      <Icon name="folder" size={14} /> {t(isPlaylist ? "Abrir pasta do download" : "Abrir local do download")}
                     </button>
                   )}
                 </div>

@@ -450,6 +450,54 @@ def test_get_file_accepts_direct_saveclip_output_path(monkeypatch, tmp_path):
     assert response.content == b"video"
 
 
+def test_playlist_file_endpoints_list_and_serve_folder_contents(monkeypatch, tmp_path):
+    task_id = "674c2d75-f5e6-433c-a2e4-bbc01e1b5b40"
+    output = tmp_path / "Selected playlist"
+    output.mkdir()
+    (output / "Lesson 1.mp4").write_bytes(b"first video")
+    (output / "Lesson 2.mp4").write_bytes(b"second video")
+    store = LocalStore(tmp_path / "state.db")
+    for status in ("queued", "analyzing", "downloading", "processing", "completed"):
+        fields = {"status": status}
+        if status == "completed":
+            fields.update(
+                {
+                    "download_dir": str(tmp_path),
+                    "file_path": str(output),
+                    "filename": output.name,
+                }
+            )
+        store.set_task_state(task_id, fields)
+    monkeypatch.setattr(main, "local_store", store)
+    monkeypatch.setattr(
+        main,
+        "settings",
+        SimpleNamespace(
+            standalone=True,
+            download_dir=tmp_path,
+            download_dirs=[tmp_path],
+            max_concurrent_downloads=1,
+            file_ttl_minutes=25,
+        ),
+    )
+
+    with TestClient(app) as client:
+        manifest = client.get(f"/api/files/{task_id}")
+        file_response = client.get(
+            f"/api/file/{task_id}/item",
+            params={"filename": "Lesson 1.mp4"},
+        )
+        direct_response = client.get(f"/api/file/{task_id}")
+
+    assert manifest.status_code == 200
+    assert manifest.json() == {
+        "files": [{"name": "Lesson 1.mp4"}, {"name": "Lesson 2.mp4"}]
+    }
+    assert file_response.status_code == 200
+    assert file_response.content == b"first video"
+    assert direct_response.status_code == 409
+
+
 def test_standalone_cleanup_preserves_completed_downloads(monkeypatch, tmp_path):
     task_id = "674c2d75-f5e6-433c-a2e4-bbc01e1b5b40"
     output = tmp_path / "My video.mp4"

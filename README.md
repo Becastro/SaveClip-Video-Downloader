@@ -27,7 +27,7 @@ O executável é um build local de desenvolvimento para Windows. Cada novo build
 - Informações do conteúdo, miniatura, autor, duração e resoluções disponíveis.
 - Escolha da pasta de destino no app desktop; quando a plataforma não informa resoluções, o vídeo ainda pode ser baixado na melhor qualidade disponível.
 - No app desktop, os arquivos concluídos ficam diretamente na pasta escolhida com nomes configuráveis; pastas técnicas por tarefa são usadas apenas temporariamente e ficam ocultas.
-- Depois de analisar um vídeo ou áudio, é possível informar um nome opcional para o arquivo; a extensão é aplicada automaticamente. Em downloads com vários itens selecionados, o nome é usado no arquivo ZIP.
+- Depois de analisar um vídeo ou áudio, é possível informar um nome opcional para o arquivo; a extensão é aplicada automaticamente. Itens selecionados de playlists são salvos juntos em uma pasta com o nome informado ou o título da playlist.
 - Ao concluir um download no app desktop, use **Abrir local do download** para abrir o Explorador de Arquivos com o arquivo selecionado.
 - Download de vídeo, áudio MP3/M4A/WAV, miniaturas e seleção de itens de playlists/carrosséis.
 - Prévia de vídeo e áudio no app, quando a plataforma oferece um formato reproduzível no navegador; em playlists, a prévia é do primeiro item.

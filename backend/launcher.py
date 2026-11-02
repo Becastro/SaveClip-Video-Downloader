@@ -80,11 +80,14 @@ class DesktopApi:
         expected_parent = download_dir if settings.standalone else download_dir / task_id
         if (
             file_path.parent != expected_parent.resolve()
-            or not file_path.is_file()
+            or not (file_path.is_file() or file_path.is_dir())
         ):
-            raise ValueError("O arquivo concluído não foi encontrado na pasta de downloads.")
+            raise ValueError("O download concluído não foi encontrado na pasta de downloads.")
 
-        subprocess.Popen(["explorer.exe", "/select,", str(file_path)])
+        if file_path.is_dir():
+            subprocess.Popen(["explorer.exe", str(file_path)])
+        else:
+            subprocess.Popen(["explorer.exe", "/select,", str(file_path)])
         return True
 
 

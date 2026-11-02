@@ -5,7 +5,6 @@ import re
 import shutil
 import subprocess
 import time
-import zipfile
 from pathlib import Path
 from urllib.parse import urlsplit
 from uuid import UUID
@@ -422,21 +421,31 @@ def download_task(
             )
             raise
 
-    file_path = files[0]
-    if selected_items and len(files) > 1:
-        archive_name = requested_output_name or _sanitize_title(
+    if selected_items:
+        folder_name = requested_output_name or _sanitize_title(
             str(result.get("title") or "saveclip")
         )
-        archive = destination / f"{archive_name}.zip"
-        with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as bundle:
-            for path in files:
-                bundle.write(path, path.name)
-        file_path = archive
+        if re.match(
+            r"^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)",
+            folder_name,
+            re.IGNORECASE,
+        ):
+            folder_name = f"_{folder_name}"
+        playlist_folder = destination / folder_name
+        folder_index = 2
+        while playlist_folder.exists():
+            playlist_folder = destination / f"{folder_name} ({folder_index})"
+            folder_index += 1
+        playlist_folder.mkdir()
         for path in files:
-            if path != archive:
-                path.unlink(missing_ok=True)
+            shutil.move(str(path), str(playlist_folder / path.name))
+        file_path = playlist_folder
+        output_size = sum(path.stat().st_size for path in playlist_folder.iterdir())
+    else:
+        file_path = files[0]
+        output_size = file_path.stat().st_size
 
-    if file_path.stat().st_size > settings.max_file_size_bytes:
+    if output_size > settings.max_file_size_bytes:
         shutil.rmtree(destination, ignore_errors=True)
         _update_state(
             task_id,
@@ -446,13 +455,21 @@ def download_task(
         raise ValueError("O arquivo excede o limite de tamanho configurado.")
 
     if settings.standalone:
-        final_path = root_dir / file_path.name
-        suffix = file_path.suffix
-        stem = file_path.stem
-        index = 2
-        while final_path.exists():
-            final_path = root_dir / f"{stem} ({index}){suffix}"
-            index += 1
+        if file_path.is_dir():
+            folder_name = file_path.name
+            final_path = root_dir / folder_name
+            index = 2
+            while final_path.exists():
+                final_path = root_dir / f"{folder_name} ({index})"
+                index += 1
+        else:
+            final_path = root_dir / file_path.name
+            suffix = file_path.suffix
+            stem = file_path.stem
+            index = 2
+            while final_path.exists():
+                final_path = root_dir / f"{stem} ({index}){suffix}"
+                index += 1
         file_path = Path(shutil.move(str(file_path), str(final_path)))
         shutil.rmtree(destination)
 
@@ -463,7 +480,7 @@ def download_task(
         filename=file_path.name,
         file_path=str(file_path),
         title=_sanitize_title(str(result.get("title") or file_path.stem)),
-        size=file_path.stat().st_size,
+        size=output_size,
     )
     logger.info(
         "Download concluído",

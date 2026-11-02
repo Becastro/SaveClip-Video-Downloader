@@ -151,7 +151,7 @@ def test_custom_name_is_used_for_download_without_forcing_an_extension(
     assert CustomNameYoutubeDL.last_options["restrictfilenames"] is False
 
 
-def test_custom_name_is_used_for_multi_item_playlist_archive(tmp_path, monkeypatch):
+def test_custom_name_is_used_for_multi_item_playlist_folder(tmp_path, monkeypatch):
     class PlaylistYoutubeDL(FakeYoutubeDL):
         def extract_info(self, _url, download):
             assert download is True
@@ -195,8 +195,19 @@ def test_custom_name_is_used_for_multi_item_playlist_archive(tmp_path, monkeypat
         output_name="Aulas selecionadas",
     )
 
-    assert Path(downloaded).name == "Aulas selecionadas.zip"
-    assert tasks.local_store.get_task_state(task_id)["filename"] == "Aulas selecionadas.zip"
+    playlist_folder = Path(downloaded)
+    assert playlist_folder.is_dir()
+    assert playlist_folder.name == "Aulas selecionadas"
+    assert sorted(path.name for path in playlist_folder.iterdir()) == [
+        "first-item.mp4",
+        "second-item.mp4",
+    ]
+    assert sorted(path.read_bytes() for path in playlist_folder.iterdir()) == [
+        b"first",
+        b"second",
+    ]
+    assert tasks.local_store.get_task_state(task_id)["filename"] == "Aulas selecionadas"
+    assert int(tasks.local_store.get_task_state(task_id)["size"]) == 11
 
 
 def test_wav_audio_download_uses_ffmpeg_wav_conversion(tmp_path, monkeypatch):

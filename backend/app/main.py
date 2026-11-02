@@ -682,26 +682,65 @@ async def progress(task_id: str, request: Request):
     )
 
 
-@app.get("/api/file/{task_id}", dependencies=[Depends(rate_limit)])
-async def get_file(task_id: str):
+async def _completed_output(task_id: str) -> tuple[dict[str, str], Path]:
     try:
         task_id = str(UUID(task_id))
     except ValueError as exc:
         raise HTTPException(status_code=404, detail="Arquivo não encontrado.") from exc
     state = await asyncio.to_thread(_get_task_state, task_id)
-    file_path = Path(state.get("file_path", ""))
+    output_path = Path(state.get("file_path", ""))
     download_dir = Path(state.get("download_dir", ""))
+    expected_parent = download_dir if settings.standalone else download_dir / task_id
     if (
         state.get("status") != TaskStatus.COMPLETED.value
-        or file_path.parent
-        != (download_dir if settings.standalone else download_dir / task_id)
+        or output_path.resolve().parent != expected_parent.resolve()
+        or not (output_path.is_file() or output_path.is_dir())
+    ):
+        raise HTTPException(status_code=404, detail="Arquivo não encontrado ou expirado.")
+    return state, output_path
+
+
+@app.get("/api/files/{task_id}", dependencies=[Depends(rate_limit)])
+async def get_playlist_files(task_id: str):
+    _, output_path = await _completed_output(task_id)
+    if not output_path.is_dir():
+        raise HTTPException(status_code=404, detail="Pasta da playlist não encontrada.")
+    return {
+        "files": [
+            {"name": path.name}
+            for path in sorted(output_path.iterdir(), key=lambda item: item.name.casefold())
+            if path.is_file() and path.resolve().parent == output_path.resolve()
+        ]
+    }
+
+
+@app.get("/api/file/{task_id}/item", dependencies=[Depends(rate_limit)])
+async def get_playlist_file(task_id: str, filename: str):
+    _, output_path = await _completed_output(task_id)
+    if (
+        not output_path.is_dir()
+        or not filename
+        or Path(filename).name != filename
+    ):
+        raise HTTPException(status_code=404, detail="Arquivo não encontrado ou expirado.")
+    file_path = output_path / filename
+    if (
+        file_path.resolve().parent != output_path.resolve()
         or not file_path.is_file()
     ):
         raise HTTPException(status_code=404, detail="Arquivo não encontrado ou expirado.")
+    return FileResponse(file_path, filename=file_path.name)
+
+
+@app.get("/api/file/{task_id}", dependencies=[Depends(rate_limit)])
+async def get_file(task_id: str):
+    state, file_path = await _completed_output(task_id)
+    if not file_path.is_file():
+        raise HTTPException(status_code=409, detail="Este download contém uma pasta de arquivos.")
     return FileResponse(
         file_path,
         filename=state.get("filename", file_path.name),
-        media_type="application/zip" if file_path.suffix == ".zip" else "application/octet-stream",
+        media_type="application/octet-stream",
     )
 
 

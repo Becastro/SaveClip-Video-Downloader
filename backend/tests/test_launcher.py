@@ -88,6 +88,33 @@ def test_open_download_location_selects_completed_file(
     assert opened == [["explorer.exe", "/select,", str(output.resolve())]]
 
 
+def test_open_download_location_opens_completed_playlist_folder(
+    monkeypatch, tmp_path
+):
+    from app import main
+    from app.local_store import LocalStore
+
+    task_id = "674c2d75-f5e6-433c-a2e4-bbc01e1b5b40"
+    output = tmp_path / "Playlist"
+    output.mkdir()
+    (output / "video.mp4").write_bytes(b"video")
+    store = LocalStore(tmp_path / "state.db")
+    for status in ("queued", "analyzing", "downloading", "processing", "completed"):
+        fields = {"status": status}
+        if status == "completed":
+            fields.update(
+                {"download_dir": str(tmp_path), "file_path": str(output)}
+            )
+        store.set_task_state(task_id, fields)
+    monkeypatch.setattr(main, "local_store", store)
+    monkeypatch.setattr(main, "settings", type("Settings", (), {"standalone": True})())
+    opened = []
+    monkeypatch.setattr(subprocess, "Popen", lambda args: opened.append(args))
+
+    assert DesktopApi().open_download_location(task_id) is True
+    assert opened == [["explorer.exe", str(output.resolve())]]
+
+
 def test_open_download_location_rejects_file_outside_download_folder(
     monkeypatch, tmp_path
 ):
